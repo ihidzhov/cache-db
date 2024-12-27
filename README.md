@@ -5,7 +5,7 @@ Simple in memory cache server like Memcache written in Go.
 ## Description
 
 In memory server to store data in palin text format, with key and values, TTL option and some statistics.
-It can me used as just cache server, or in memory database.
+It can br used as just cache server, or in memory database.
 Data can be retreived as plain/text or application/json response.
 
 ## Getting Started
@@ -36,6 +36,11 @@ curl --location 'http://localhost:8080/set' \
 * To get data send GET request to /get
 ```
 curl --location 'http://localhost:8080/get?key=key'
+```
+
+* To get data as JSON response send GET request to /get?output=json
+```
+curl --location 'http://localhost:8080/get?key=key&output=json'
 ```
 
 ## Help
