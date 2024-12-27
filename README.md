@@ -43,6 +43,16 @@ curl --location 'http://localhost:8080/get?key=key'
 curl --location 'http://localhost:8080/get?key=key&output=json'
 ```
 
+## All API end points
+```
+POST   /set                        form-data: key, value, ttl
+GET    /get?key=key
+GET    /get?key=key?output=json
+DELETE /delete                     form-data: key
+GET    /stats
+```
+
+
 ## Help
 
 Please use issues in this repo for any questions, bugs, features suggestions and so on.
