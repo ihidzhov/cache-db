@@ -15,19 +15,27 @@ Data can be retreived as plain/text or application/json response.
 * Go
 * Git
 
-### Installing
+### Install and run
 
-* How/where to download your program
-* Any modifications needed to be made to files/folders
-
-### Executing program
-
-* How to run the program
-* Step-by-step bullets
 ```
 git clone https://github.com/ihidzhov/cache-db.git cache-server
 cd cache-server
 go run .
+```
+
+## How it works
+
+* To store data just send POST request to /set with form params key, value, ttl
+```
+curl --location 'http://localhost:8080/set' \
+--form 'key="key"' \
+--form 'value="value"' \
+--form 'ttl="300"'
+```
+
+* To get data send GET request to /get
+```
+curl --location 'http://localhost:8080/get?key=key'
 ```
 
 ## Help
