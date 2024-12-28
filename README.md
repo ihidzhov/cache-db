@@ -30,6 +30,8 @@ GET    /get?key=key
 GET    /get?key=key?output=json
 DELETE /delete                     form-data: key
 GET    /stats
+PUT    /increment                  form-data: key
+PUT    /decrement                  form-data: key
 ```
 
 ## How it works
