@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -68,10 +67,19 @@ func (s *CacheHandlers) StatsHandler(w http.ResponseWriter, r *http.Request) {
 
 func (s *CacheHandlers) IncrementHandler(w http.ResponseWriter, r *http.Request) {
 	key := r.FormValue("key")
+	IncrementDecrementValue(s, w, r, key, 1)
+}
+
+func (s *CacheHandlers) DecrementHandler(w http.ResponseWriter, r *http.Request) {
+	key := r.FormValue("key")
+	IncrementDecrementValue(s, w, r, key, -1)
+}
+
+func IncrementDecrementValue(s *CacheHandlers, w http.ResponseWriter, r *http.Request, key string, what int) {
 	s.cache.stats.IncrementHits()
 
 	item, found := s.cache.Get(key)
-	fmt.Println(item, found)
+
 	if !found {
 		s.cache.stats.IncrementMisses()
 		http.Error(w, "Key not found", http.StatusBadRequest)
@@ -83,7 +91,7 @@ func (s *CacheHandlers) IncrementHandler(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "Something wrong with the value", http.StatusBadRequest)
 		return
 	}
-	intValue = intValue + 1
+	intValue = intValue + what
 	item.Value = strconv.Itoa(intValue)
 	s.cache.Set(key, item.Value, item.Expiration)
 
