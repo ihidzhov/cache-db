@@ -30,6 +30,11 @@ func (s *CacheHandlers) SetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *CacheHandlers) GetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
+		return
+	}
+
 	key := r.URL.Query().Get("key")
 	output := r.URL.Query().Get("output")
 
@@ -54,6 +59,10 @@ func (s *CacheHandlers) GetHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *CacheHandlers) DeleteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "DELETE" {
+		http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
+		return
+	}
 	key := r.URL.Query().Get("key")
 	s.cache.Delete(key)
 	w.WriteHeader(http.StatusOK)
@@ -66,11 +75,19 @@ func (s *CacheHandlers) StatsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *CacheHandlers) IncrementHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "PUT" {
+		http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
+		return
+	}
 	key := r.FormValue("key")
 	IncrementDecrementValue(s, w, r, key, 1)
 }
 
 func (s *CacheHandlers) DecrementHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "PUT" {
+		http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
+		return
+	}
 	key := r.FormValue("key")
 	IncrementDecrementValue(s, w, r, key, -1)
 }
