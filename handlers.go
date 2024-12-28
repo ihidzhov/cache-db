@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 )
 
@@ -23,8 +25,8 @@ func (s *CacheHandlers) SetHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Invalid parameters", http.StatusBadRequest)
 		return
 	}
-
-	s.cache.Set(key, value, int(ttl.Seconds()))
+	ttlFormated := time.Now().Add(time.Duration(int(ttl.Seconds())) * time.Second)
+	s.cache.Set(key, value, ttlFormated)
 	w.WriteHeader(http.StatusOK)
 }
 
@@ -34,7 +36,7 @@ func (s *CacheHandlers) GetHandler(w http.ResponseWriter, r *http.Request) {
 
 	s.cache.stats.IncrementHits()
 
-	value, found := s.cache.Get(key)
+	item, found := s.cache.Get(key)
 	if !found {
 		s.cache.stats.IncrementMisses()
 		http.Error(w, "Key not found", http.StatusNotFound)
@@ -44,11 +46,11 @@ func (s *CacheHandlers) GetHandler(w http.ResponseWriter, r *http.Request) {
 	if output == "json" {
 		w.Header().Set("Content-Type", "application/json")
 		var jsonMap map[string]interface{}
-		json.Unmarshal([]byte(value), &jsonMap)
+		json.Unmarshal([]byte(item.Value), &jsonMap)
 		json.NewEncoder(w).Encode(jsonMap)
 	} else {
 		w.Header().Set("Content-Type", "plain/text")
-		json.NewEncoder(w).Encode(value)
+		json.NewEncoder(w).Encode(item.Value)
 	}
 }
 
@@ -62,4 +64,28 @@ func (s *CacheHandlers) StatsHandler(w http.ResponseWriter, r *http.Request) {
 	stats := s.cache.GetStats()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(stats)
+}
+
+func (s *CacheHandlers) IncrementHandler(w http.ResponseWriter, r *http.Request) {
+	key := r.FormValue("key")
+	s.cache.stats.IncrementHits()
+
+	item, found := s.cache.Get(key)
+	fmt.Println(item, found)
+	if !found {
+		s.cache.stats.IncrementMisses()
+		http.Error(w, "Key not found", http.StatusBadRequest)
+		return
+	}
+
+	intValue, err := StringToInt(item.Value)
+	if err != nil {
+		http.Error(w, "Something wrong with the value", http.StatusBadRequest)
+		return
+	}
+	intValue = intValue + 1
+	item.Value = strconv.Itoa(intValue)
+	s.cache.Set(key, item.Value, item.Expiration)
+
+	w.WriteHeader(http.StatusOK)
 }

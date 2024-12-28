@@ -21,6 +21,7 @@ func main() {
 	http.HandleFunc("/get", server.GetHandler)
 	http.HandleFunc("/delete", server.DeleteHandler)
 	http.HandleFunc("/stats", server.StatsHandler)
+	http.HandleFunc("/increment", server.IncrementHandler)
 
 	fmt.Println("HTTP cache server with TTL running on :8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

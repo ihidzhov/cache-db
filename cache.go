@@ -34,25 +34,25 @@ func NewCache() *Cache {
 	return cache
 }
 
-func (c *Cache) Set(key, value string, ttl int) {
+func (c *Cache) Set(key, value string, ttl time.Time) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.data[key] = CacheItem{
 		Value:      value,
-		Expiration: time.Now().Add(time.Duration(ttl) * time.Second),
+		Expiration: ttl,
 	}
 }
 
-func (c *Cache) Get(key string) (string, bool) {
+func (c *Cache) Get(key string) (CacheItem, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	item, found := c.data[key]
 	if !found || time.Now().After(item.Expiration) {
-		return "", false
+		return CacheItem{}, false
 	}
-	return item.Value, true
+	return item, true
 }
 
 func (c *Cache) Delete(key string) {
