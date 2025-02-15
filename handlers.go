@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 )
 
@@ -58,6 +58,37 @@ func (s *CacheHandlers) GetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (s *CacheHandlers) SearchHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != "GET" {
+		http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
+		return
+	}
+	//	output := r.URL.Query().Get("output")
+
+	seach := Search{}
+	searchParams := seach.PrepareParams(r)
+	fmt.Println(searchParams)
+	results := seach.Find(searchParams, s.cache)
+	fmt.Println(results)
+
+	searchResult := SearchResult{
+		Results: results,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(searchResult)
+
+	// "results": results,
+	//        "meta": map[string]interface{}{
+	//            "total":  len(results),
+	//            "limit":  limit,
+	//            "offset": offset,
+	//            "query":  query,
+	//            "sort":   sort,
+	//        }
+
+}
+
 func (s *CacheHandlers) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "DELETE" {
 		http.Error(w, "Invalid method", http.StatusMethodNotAllowed)
@@ -90,27 +121,4 @@ func (s *CacheHandlers) DecrementHandler(w http.ResponseWriter, r *http.Request)
 	}
 	key := r.FormValue("key")
 	IncrementDecrementValue(s, w, r, key, -1)
-}
-
-func IncrementDecrementValue(s *CacheHandlers, w http.ResponseWriter, r *http.Request, key string, what int) {
-	s.cache.stats.IncrementHits()
-
-	item, found := s.cache.Get(key)
-
-	if !found {
-		s.cache.stats.IncrementMisses()
-		http.Error(w, "Key not found", http.StatusBadRequest)
-		return
-	}
-
-	intValue, err := StringToInt(item.Value)
-	if err != nil {
-		http.Error(w, "Something wrong with the value", http.StatusBadRequest)
-		return
-	}
-	intValue = intValue + what
-	item.Value = strconv.Itoa(intValue)
-	s.cache.Set(key, item.Value, item.Expiration)
-
-	w.WriteHeader(http.StatusOK)
 }

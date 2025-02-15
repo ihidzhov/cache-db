@@ -19,6 +19,7 @@ func main() {
 
 	http.HandleFunc("/set", server.SetHandler)
 	http.HandleFunc("/get", server.GetHandler)
+	http.HandleFunc("/search", server.SearchHandler)
 	http.HandleFunc("/delete", server.DeleteHandler)
 	http.HandleFunc("/stats", server.StatsHandler)
 	http.HandleFunc("/increment", server.IncrementHandler)

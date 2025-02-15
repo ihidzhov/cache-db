@@ -5,6 +5,8 @@ import (
 	"time"
 )
 
+const AutoCleanUpInterval = 20
+
 type CacheForm struct {
 	Key   string                 `json:"key"`
 	Value string                 `json:"value"`
@@ -30,7 +32,7 @@ func NewCache() *Cache {
 		stopChan: make(chan struct{}),
 		stats:    CacheStats{TotalKeys: 0, Hits: 0, Misses: 0},
 	}
-	go cache.startAutoCleanup(10 * time.Second)
+	go cache.startAutoCleanup(AutoCleanUpInterval * time.Second)
 	return cache
 }
 
