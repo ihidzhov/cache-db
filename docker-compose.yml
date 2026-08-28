@@ -1,0 +1,17 @@
+services:
+  cache-db:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      CACHE_ADDR: ":8080"
+      CACHE_CLEANUP_INTERVAL: "20"
+      CACHE_MAX_KEYS: "0"
+      CACHE_MAX_VALUE_BYTES: "0"
+      CACHE_MAX_MEMORY_BYTES: "0"
+      CACHE_EVICTION_POLICY: "lru"
+      CACHE_RATE_LIMIT: "0"
+      CACHE_RATE_LIMIT_BURST: "10"
+      CACHE_CORS_ORIGIN: ""
+      # CACHE_API_KEY: "changeme"
+    restart: unless-stopped

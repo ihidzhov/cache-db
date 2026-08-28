@@ -1,0 +1,913 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cache-db dashboard</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #e2e4e9;
+    --text: #1a1d23;
+    --text-dim: #6b7280;
+    --accent: #3b6fe0;
+    --accent-dim: #eaf0fd;
+    --green: #1a9f5c;
+    --red: #d6455d;
+    --amber: #c98a1a;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14161a;
+      --panel: #1c1f26;
+      --border: #2b2f38;
+      --text: #e7e9ee;
+      --text-dim: #8a90a0;
+      --accent: #6d93ee;
+      --accent-dim: #202942;
+      --green: #3ecf8e;
+      --red: #f06b81;
+      --amber: #e0ac4c;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 14px;
+  }
+  header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 16px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+    white-space: nowrap;
+  }
+  .status-dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    flex: none;
+    transition: background 0.2s;
+  }
+  .status-dot.ok { background: var(--green); }
+  .status-dot.bad { background: var(--red); }
+  .status-line {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  header .spacer { flex: 1; }
+  .mini-stats {
+    display: flex;
+    gap: 14px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--text-dim);
+    flex-wrap: wrap;
+  }
+  .mini-stats b { color: var(--text); font-weight: 600; }
+  button, .btn {
+    font: inherit;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 10px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+  }
+  button.danger { color: var(--red); border-color: var(--red); background: transparent; }
+  button.danger:hover { background: var(--red); color: #fff; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  input, select {
+    font: inherit;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text);
+    border-radius: 6px;
+    padding: 6px 8px;
+  }
+  input:focus, select:focus, button:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  #settings-popover {
+    position: absolute;
+    right: 16px;
+    top: 48px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    width: 280px;
+    display: none;
+    z-index: 20;
+  }
+  #settings-popover.open { display: block; }
+  #settings-popover label {
+    display: block;
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    margin-top: 10px;
+  }
+  #settings-popover input { width: 100%; }
+  main {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 16px;
+    padding: 16px;
+    max-width: 1400px;
+    margin: 0 auto;
+    align-items: start;
+  }
+  @media (max-width: 860px) {
+    main { grid-template-columns: 1fr; }
+    .keys-panel { max-height: none !important; }
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+  }
+  .panel h2 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--text-dim);
+    margin: 0 0 10px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .panel h2 .refresh-btn {
+    border: none;
+    background: none;
+    color: var(--text-dim);
+    padding: 2px 4px;
+    font-size: 13px;
+  }
+  .stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .stat-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .stat-card .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.03em; }
+  .stat-card .value { font-family: var(--mono); font-size: 19px; font-weight: 600; margin-top: 2px; }
+  #sparkline { width: 100%; height: 60px; display: block; }
+  .config-grid {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 6px 14px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+  }
+  .config-grid dt { color: var(--text-dim); }
+  .config-grid dd { margin: 0; text-align: right; }
+  .pill {
+    display: inline-block;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-family: var(--mono);
+  }
+  .pill.on { background: var(--accent-dim); color: var(--accent); }
+  .pill.off { background: var(--bg); color: var(--text-dim); border: 1px solid var(--border); }
+  .keys-panel {
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 84px);
+    position: sticky;
+    top: 68px;
+  }
+  .keys-panel h2 { flex: none; }
+  .search-row { display: flex; gap: 6px; margin-bottom: 10px; flex: none; }
+  .mode-toggle {
+    display: flex;
+    flex: none;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .mode-toggle button {
+    border: none;
+    border-radius: 0;
+    background: var(--bg);
+    color: var(--text-dim);
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  .mode-toggle button + button { border-left: 1px solid var(--border); }
+  .mode-toggle button.active { background: var(--accent); color: #fff; }
+  .search-row input { flex: 1; min-width: 0; }
+  #key-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    flex: 1;
+    min-height: 80px;
+    overflow-y: auto;
+    border-top: 1px solid var(--border);
+    border-radius: 6px;
+  }
+  #key-list li {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--border);
+    border-left: 3px solid transparent;
+    cursor: pointer;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    transition: background 0.12s, border-left-color 0.12s;
+  }
+  #key-list li.type-string { border-left-color: var(--accent); }
+  #key-list li.type-list { border-left-color: var(--amber); }
+  #key-list li.type-hash { border-left-color: var(--green); }
+  #key-list li:hover { background: var(--bg); }
+  #key-list li.selected { background: var(--accent-dim); }
+  #key-list li .k-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .type-badge {
+    font-size: 9.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: var(--bg);
+    color: var(--text-dim);
+    flex: none;
+  }
+  .type-badge.string { color: var(--accent); background: var(--accent-dim); }
+  .type-badge.list { color: var(--amber); background: color-mix(in srgb, var(--amber) 15%, var(--bg)); }
+  .type-badge.hash { color: var(--green); background: color-mix(in srgb, var(--green) 15%, var(--bg)); }
+  .type-badge.json-badge { color: var(--accent); border: 1px solid var(--accent); background: transparent; }
+  .list-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 8px 0;
+    color: var(--text-dim);
+    font-size: 12px;
+    flex: none;
+  }
+  .add-key-details {
+    flex: none;
+    margin-top: 4px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+  }
+  .add-key-details summary {
+    cursor: pointer;
+    font-size: 12.5px;
+    color: var(--accent);
+    font-weight: 600;
+    padding: 4px 2px;
+    list-style: none;
+  }
+  .add-key-details summary::-webkit-details-marker { display: none; }
+  .add-key-form {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 10px;
+    background: var(--bg);
+    border-radius: 8px;
+  }
+  .add-key-form .row { display: flex; gap: 6px; }
+  .add-key-form input { flex: 1; min-width: 0; }
+  .add-key-form input[name=ttl] { flex: none; width: 70px; }
+  #empty-state {
+    color: var(--text-dim);
+    text-align: center;
+    padding: 60px 20px;
+  }
+  #detail-header {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+  }
+  #detail-header .k-name {
+    font-family: var(--mono);
+    font-size: 17px;
+    font-weight: 600;
+    word-break: break-all;
+  }
+  #detail-meta {
+    color: var(--text-dim);
+    font-size: 12px;
+    margin-bottom: 14px;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  #detail-actions { margin-left: auto; display: flex; gap: 6px; }
+  .json-key { color: var(--accent); }
+  .json-str { color: var(--green); }
+  .json-num { color: var(--amber); }
+  .json-bool { color: #b06fe0; }
+  .json-null { color: var(--text-dim); font-style: italic; }
+  .value-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    max-height: 50vh;
+    overflow: auto;
+  }
+  table.kv { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 12.5px; }
+  table.kv td { padding: 5px 8px; border-bottom: 1px solid var(--border); vertical-align: top; word-break: break-all; }
+  table.kv td.f { color: var(--text-dim); width: 30%; }
+  ol.list-values { font-family: var(--mono); font-size: 12.5px; margin: 0; padding-left: 26px; }
+  ol.list-values li { padding: 3px 0; border-bottom: 1px dashed var(--border); word-break: break-all; }
+  .toast {
+    position: fixed;
+    bottom: 18px;
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    background: var(--text);
+    color: var(--bg);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s, transform 0.2s;
+    z-index: 30;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .toast.error { background: var(--red); color: #fff; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="status-dot" id="status-dot"></div>
+  <h1>cache-db</h1>
+  <div class="status-line" id="status-line">connecting…</div>
+  <div class="spacer"></div>
+  <div class="mini-stats" id="mini-stats"></div>
+  <button id="settings-btn" title="Settings">⚙</button>
+</header>
+
+<div id="settings-popover">
+  <label for="api-key-input">API key (if -api-key is set)</label>
+  <input id="api-key-input" type="password" placeholder="X-API-Key" autocomplete="off">
+  <label for="poll-interval-input">Refresh interval (seconds)</label>
+  <input id="poll-interval-input" type="number" min="1" max="60" value="3">
+  <div style="margin-top:12px; display:flex; gap:6px; justify-content:flex-end;">
+    <button id="settings-save" class="primary">Save</button>
+  </div>
+</div>
+
+<main>
+  <div class="panel keys-panel">
+    <h2>Keys</h2>
+    <div class="search-row">
+      <div class="mode-toggle" id="search-mode-toggle">
+        <button type="button" class="active" data-mode="key">Key</button>
+        <button type="button" data-mode="value">Value</button>
+      </div>
+      <input id="key-search" type="text" placeholder="Filter…">
+    </div>
+    <ul id="key-list"></ul>
+    <div class="list-footer">
+      <span id="key-count"></span>
+      <button id="key-refresh">Reload</button>
+    </div>
+    <details class="add-key-details">
+      <summary>+ Add string key</summary>
+      <form class="add-key-form" id="add-key-form">
+        <div class="row">
+          <input name="key" placeholder="new key" required>
+        </div>
+        <div class="row">
+          <input name="value" placeholder="value" required>
+          <input name="ttl" placeholder="ttl" value="300" required>
+        </div>
+        <button type="submit" class="primary">Add string key</button>
+      </form>
+    </details>
+  </div>
+
+  <div>
+    <div class="panel" style="margin-bottom:16px;">
+      <h2>Overview<button class="refresh-btn" id="stats-refresh">↻</button></h2>
+      <div class="stat-grid" id="stat-grid"></div>
+      <svg id="sparkline" viewBox="0 0 600 60" preserveAspectRatio="none"></svg>
+    </div>
+
+    <div class="panel" style="margin-bottom:16px;">
+      <h2>Config<button class="refresh-btn" id="config-refresh">↻</button></h2>
+      <dl class="config-grid" id="config-grid"></dl>
+    </div>
+
+    <div class="panel">
+      <h2>Data <span style="margin-left:auto; display:flex; gap:6px;"><button id="seed-btn">Seed demo data</button><button class="danger" id="flush-btn">Flush all</button></span></h2>
+      <div id="detail"><div id="empty-state">Select a key on the left to view its data.</div></div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const state = {
+  apiKey: localStorage.getItem('cachedb_api_key') || '',
+  pollInterval: parseInt(localStorage.getItem('cachedb_poll_interval') || '3', 10),
+  allKeys: [],
+  keysTotal: 0,
+  keysLimit: 2000,
+  page: 0,
+  pageSize: 20,
+  searchMode: 'key',
+  filterText: '',
+  valueSearchResults: null,
+  selected: null,
+  history: [],
+  prevStats: null,
+};
+
+function toast(msg, isError) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isError ? ' error' : '');
+  clearTimeout(toast._t);
+  toast._t = setTimeout(() => { el.className = 'toast'; }, 2500);
+}
+
+async function api(path, opts) {
+  opts = opts || {};
+  const headers = Object.assign({}, opts.headers || {});
+  if (state.apiKey) headers['X-API-Key'] = state.apiKey;
+  const res = await fetch(path, Object.assign({}, opts, { headers }));
+  return res;
+}
+
+async function apiJSON(path, opts) {
+  const res = await api(path, opts);
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText);
+    throw new Error(res.status + ': ' + text.trim());
+  }
+  const ct = res.headers.get('content-type') || '';
+  if (ct.indexOf('application/json') !== -1) return res.json();
+  return res.text();
+}
+
+function fmtBytes(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  return (n / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function fmtNum(n) {
+  return new Intl.NumberFormat().format(n);
+}
+
+async function refreshHealth() {
+  const dot = document.getElementById('status-dot');
+  const line = document.getElementById('status-line');
+  try {
+    const res = await fetch('/health');
+    if (res.ok) {
+      dot.className = 'status-dot ok';
+      line.textContent = 'online';
+    } else {
+      dot.className = 'status-dot bad';
+      line.textContent = 'unhealthy (' + res.status + ')';
+    }
+  } catch (e) {
+    dot.className = 'status-dot bad';
+    line.textContent = 'unreachable';
+  }
+}
+
+function pushHistory(stats) {
+  const now = Date.now();
+  let hitsDelta = 0, missesDelta = 0;
+  if (state.prevStats) {
+    hitsDelta = Math.max(0, stats.hits - state.prevStats.hits);
+    missesDelta = Math.max(0, stats.misses - state.prevStats.misses);
+  }
+  state.prevStats = stats;
+  state.history.push({ t: now, hits: hitsDelta, misses: missesDelta });
+  if (state.history.length > 40) state.history.shift();
+}
+
+function drawSparkline() {
+  const svg = document.getElementById('sparkline');
+  const w = 600, h = 60;
+  const pts = state.history;
+  if (pts.length < 2) { svg.innerHTML = ''; return; }
+
+  let max = 1;
+  for (const p of pts) max = Math.max(max, p.hits, p.misses);
+
+  const stepX = w / (pts.length - 1);
+  const toY = v => h - 4 - (v / max) * (h - 8);
+
+  const hitsPath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + (i * stepX).toFixed(1) + ',' + toY(p.hits).toFixed(1)).join(' ');
+  const missPath = pts.map((p, i) => (i === 0 ? 'M' : 'L') + (i * stepX).toFixed(1) + ',' + toY(p.misses).toFixed(1)).join(' ');
+
+  svg.innerHTML =
+    '<path d="' + hitsPath + '" fill="none" stroke="var(--green)" stroke-width="2" />' +
+    '<path d="' + missPath + '" fill="none" stroke="var(--red)" stroke-width="2" />';
+}
+
+async function refreshStats() {
+  try {
+    const stats = await apiJSON('/stats');
+    pushHistory(stats);
+
+    const hitRatio = (stats.hits + stats.misses) > 0
+      ? ((stats.hits / (stats.hits + stats.misses)) * 100).toFixed(1) + '%'
+      : '—';
+
+    document.getElementById('stat-grid').innerHTML = [
+      ['Keys', fmtNum(stats.total_keys)],
+      ['Size', fmtBytes(stats.approx_bytes)],
+      ['Hits', fmtNum(stats.hits)],
+      ['Misses', fmtNum(stats.misses)],
+      ['Hit ratio', hitRatio],
+      ['Evictions', fmtNum(stats.evictions)],
+    ].map(([label, value]) =>
+      '<div class="stat-card"><div class="label">' + label + '</div><div class="value">' + value + '</div></div>'
+    ).join('');
+
+    document.getElementById('mini-stats').innerHTML =
+      '<span><b>' + fmtNum(stats.total_keys) + '</b> keys</span>' +
+      '<span><b>' + hitRatio + '</b> hit ratio</span>' +
+      '<span>up ' + stats.uptime + '</span>';
+
+    drawSparkline();
+  } catch (e) {
+    document.getElementById('mini-stats').textContent = '';
+  }
+}
+
+async function refreshConfig() {
+  try {
+    const cfg = await apiJSON('/config');
+    const rows = [
+      ['addr', cfg.addr],
+      ['cleanup interval', cfg.cleanup_interval_seconds + 's'],
+      ['max keys', cfg.max_keys || 'unlimited'],
+      ['max value bytes', cfg.max_value_bytes || 'unlimited'],
+      ['max memory bytes', cfg.max_memory_bytes || 'unlimited'],
+      ['eviction policy', cfg.eviction_policy],
+      ['rate limit', cfg.rate_limit ? (cfg.rate_limit + '/s, burst ' + cfg.rate_limit_burst) : 'disabled'],
+      ['cors origin', cfg.cors_origin || 'disabled'],
+    ];
+    let html = rows.map(([k, v]) => '<dt>' + k + '</dt><dd>' + v + '</dd>').join('');
+    html += '<dt>auth</dt><dd><span class="pill ' + (cfg.auth_enabled ? 'on">enabled' : 'off">disabled') + '</span></dd>';
+    document.getElementById('config-grid').innerHTML = html;
+  } catch (e) {
+    document.getElementById('config-grid').innerHTML = '<dt>error</dt><dd>' + e.message + '</dd>';
+  }
+}
+
+function typeBadge(type) {
+  return '<span class="type-badge ' + type + '">' + type + '</span>';
+}
+
+function renderKeyList() {
+  const listEl = document.getElementById('key-list');
+  const countEl = document.getElementById('key-count');
+
+  let rows;
+  if (state.valueSearchResults) {
+    rows = state.valueSearchResults.map(r => ({ key: r.Key, type: r.Type, expires_at: null, size_bytes: null }));
+  } else {
+    const filter = state.filterText.toLowerCase();
+    rows = state.allKeys.filter(k => !filter || k.key.toLowerCase().indexOf(filter) !== -1);
+  }
+
+  const total = rows.length;
+  const start = state.page * state.pageSize;
+  const pageRows = rows.slice(start, start + state.pageSize);
+
+  if (pageRows.length === 0) {
+    listEl.innerHTML = '<li style="cursor:default;color:var(--text-dim);justify-content:center;">no keys</li>';
+  } else {
+    listEl.innerHTML = pageRows.map(k =>
+      '<li data-key="' + encodeURIComponent(k.key) + '" data-type="' + k.type + '" class="type-' + k.type + ' ' + (state.selected === k.key ? 'selected' : '') + '">' +
+        typeBadge(k.type) +
+        '<span class="k-name">' + escapeHtml(k.key) + '</span>' +
+      '</li>'
+    ).join('');
+  }
+
+  const pages = Math.max(1, Math.ceil(total / state.pageSize));
+  countEl.textContent = total + ' key' + (total === 1 ? '' : 's') + ' · page ' + (state.page + 1) + '/' + pages;
+
+  listEl.querySelectorAll('li[data-key]').forEach(li => {
+    li.addEventListener('click', () => {
+      selectKey(decodeURIComponent(li.dataset.key), li.dataset.type);
+    });
+  });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function prettyJSONOrNull(text) {
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (e) {
+    return null;
+  }
+  if (parsed === null || typeof parsed !== 'object') return null;
+  return highlightJSON(JSON.stringify(parsed, null, 2));
+}
+
+function highlightJSON(json) {
+  const escaped = json.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  return escaped.replace(
+    /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false)\b|\bnull\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)/g,
+    (match) => {
+      let cls = 'json-num';
+      if (/^"/.test(match)) cls = /:$/.test(match) ? 'json-key' : 'json-str';
+      else if (/true|false/.test(match)) cls = 'json-bool';
+      else if (/null/.test(match)) cls = 'json-null';
+      return '<span class="' + cls + '">' + match + '</span>';
+    }
+  );
+}
+
+async function loadKeys() {
+  try {
+    const data = await apiJSON('/keys?limit=' + state.keysLimit + '&offset=0');
+    state.allKeys = data.keys;
+    state.keysTotal = data.meta.total;
+    renderKeyList();
+  } catch (e) {
+    toast('Failed to load keys: ' + e.message, true);
+  }
+}
+
+async function runValueSearch(query) {
+  if (!query) {
+    state.valueSearchResults = null;
+    state.page = 0;
+    renderKeyList();
+    return;
+  }
+  try {
+    const data = await apiJSON('/search?query=' + encodeURIComponent(query) + '&limit=200');
+    state.valueSearchResults = data.results || [];
+    state.page = 0;
+    renderKeyList();
+  } catch (e) {
+    toast('Search failed: ' + e.message, true);
+  }
+}
+
+async function selectKey(key, type) {
+  state.selected = key;
+  renderKeyList();
+
+  const detail = document.getElementById('detail');
+  detail.innerHTML = '<div id="empty-state">Loading…</div>';
+
+  try {
+    const meta = state.allKeys.find(k => k.key === key);
+    let valueHtml;
+
+    let isJSON = false;
+    if (type === 'string') {
+      const text = await (await api('/get?key=' + encodeURIComponent(key))).text();
+      const pretty = prettyJSONOrNull(text);
+      if (pretty !== null) {
+        isJSON = true;
+        valueHtml = '<div class="value-box json-value">' + pretty + '</div>';
+      } else {
+        valueHtml = '<div class="value-box">' + escapeHtml(text) + '</div>';
+      }
+    } else if (type === 'list') {
+      const items = await apiJSON('/lrange?key=' + encodeURIComponent(key) + '&start=0&stop=-1');
+      valueHtml = items.length
+        ? '<ol class="list-values">' + items.map(v => '<li>' + escapeHtml(v) + '</li>').join('') + '</ol>'
+        : '<div class="value-box">(empty list)</div>';
+    } else if (type === 'hash') {
+      const fields = await apiJSON('/hgetall?key=' + encodeURIComponent(key));
+      const entries = Object.entries(fields);
+      valueHtml = entries.length
+        ? '<table class="kv">' + entries.map(([f, v]) => '<tr><td class="f">' + escapeHtml(f) + '</td><td>' + escapeHtml(v) + '</td></tr>').join('') + '</table>'
+        : '<div class="value-box">(empty hash)</div>';
+    } else {
+      valueHtml = '<div class="value-box">unknown type</div>';
+    }
+
+    const metaLine = meta
+      ? 'size ' + fmtBytes(meta.size_bytes) + ' · expires ' + (meta.expires_at ? new Date(meta.expires_at).toLocaleString() : 'never')
+      : '';
+
+    detail.innerHTML =
+      '<div id="detail-header">' +
+        typeBadge(type) +
+        (isJSON ? '<span class="type-badge json-badge">JSON</span>' : '') +
+        '<span class="k-name">' + escapeHtml(key) + '</span>' +
+        '<span id="detail-actions"><button id="delete-key-btn" class="danger">Delete</button></span>' +
+      '</div>' +
+      '<div id="detail-meta">' + metaLine + '</div>' +
+      valueHtml;
+
+    document.getElementById('delete-key-btn').addEventListener('click', () => deleteKey(key));
+  } catch (e) {
+    detail.innerHTML = '<div id="empty-state">Failed to load: ' + escapeHtml(e.message) + '</div>';
+  }
+}
+
+async function deleteKey(key) {
+  if (!confirm('Delete key "' + key + '"?')) return;
+  try {
+    await api('/delete?key=' + encodeURIComponent(key), { method: 'DELETE' });
+    toast('Deleted "' + key + '"');
+    state.selected = null;
+    document.getElementById('detail').innerHTML = '<div id="empty-state">Select a key on the left to view its data.</div>';
+    await loadKeys();
+  } catch (e) {
+    toast('Delete failed: ' + e.message, true);
+  }
+}
+
+async function seedData() {
+  try {
+    const res = await api('/seed', { method: 'POST' });
+    if (!res.ok) throw new Error(await res.text());
+    const data = await res.json();
+    toast('Seeded demo data (' + data.writes + ' writes)');
+    await loadKeys();
+    await refreshStats();
+  } catch (e) {
+    toast('Seed failed: ' + e.message, true);
+  }
+}
+
+async function flushAll() {
+  if (!confirm('Flush the ENTIRE cache? This cannot be undone.')) return;
+  try {
+    await api('/flush', { method: 'DELETE' });
+    toast('Cache flushed');
+    state.selected = null;
+    document.getElementById('detail').innerHTML = '<div id="empty-state">Select a key on the left to view its data.</div>';
+    await loadKeys();
+    await refreshStats();
+  } catch (e) {
+    toast('Flush failed: ' + e.message, true);
+  }
+}
+
+function initSettings() {
+  const popover = document.getElementById('settings-popover');
+  const btn = document.getElementById('settings-btn');
+  const apiKeyInput = document.getElementById('api-key-input');
+  const pollInput = document.getElementById('poll-interval-input');
+
+  apiKeyInput.value = state.apiKey;
+  pollInput.value = state.pollInterval;
+
+  btn.addEventListener('click', () => popover.classList.toggle('open'));
+  document.addEventListener('click', (e) => {
+    if (!popover.contains(e.target) && e.target !== btn) popover.classList.remove('open');
+  });
+
+  document.getElementById('settings-save').addEventListener('click', () => {
+    state.apiKey = apiKeyInput.value.trim();
+    state.pollInterval = Math.max(1, parseInt(pollInput.value, 10) || 3);
+    localStorage.setItem('cachedb_api_key', state.apiKey);
+    localStorage.setItem('cachedb_poll_interval', String(state.pollInterval));
+    popover.classList.remove('open');
+    toast('Settings saved');
+    restartPolling();
+    loadKeys();
+    refreshConfig();
+  });
+}
+
+function initKeyBrowser() {
+  document.getElementById('key-refresh').addEventListener('click', loadKeys);
+
+  const searchInput = document.getElementById('key-search');
+  const searchModeToggle = document.getElementById('search-mode-toggle');
+  let debounceT;
+
+  searchInput.addEventListener('input', () => {
+    clearTimeout(debounceT);
+    debounceT = setTimeout(() => {
+      if (state.searchMode === 'key') {
+        state.filterText = searchInput.value;
+        state.page = 0;
+        renderKeyList();
+      } else {
+        runValueSearch(searchInput.value.trim());
+      }
+    }, 200);
+  });
+
+  searchModeToggle.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-mode]');
+    if (!btn || btn.classList.contains('active')) return;
+    searchModeToggle.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    state.searchMode = btn.dataset.mode;
+    state.valueSearchResults = null;
+    searchInput.value = '';
+    state.filterText = '';
+    state.page = 0;
+    searchInput.placeholder = state.searchMode === 'key' ? 'Filter by key…' : 'Search value contents…';
+    renderKeyList();
+  });
+
+  document.getElementById('add-key-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target;
+    const key = form.key.value.trim();
+    const value = form.value.value;
+    const ttl = form.ttl.value.trim() || '300';
+    try {
+      const res = await api('/set?key=' + encodeURIComponent(key) + '&value=' + encodeURIComponent(value) + '&ttl=' + encodeURIComponent(ttl), { method: 'POST' });
+      if (!res.ok) throw new Error(await res.text());
+      toast('Key "' + key + '" saved');
+      form.reset();
+      form.ttl.value = '300';
+      form.closest('details').open = false;
+      await loadKeys();
+    } catch (err) {
+      toast('Failed to save key: ' + err.message, true);
+    }
+  });
+}
+
+let pollTimer = null;
+function restartPolling() {
+  if (pollTimer) clearInterval(pollTimer);
+  pollTimer = setInterval(() => {
+    refreshHealth();
+    refreshStats();
+  }, state.pollInterval * 1000);
+}
+
+document.getElementById('stats-refresh').addEventListener('click', refreshStats);
+document.getElementById('config-refresh').addEventListener('click', refreshConfig);
+document.getElementById('seed-btn').addEventListener('click', seedData);
+document.getElementById('flush-btn').addEventListener('click', flushAll);
+
+initSettings();
+initKeyBrowser();
+refreshHealth();
+refreshStats();
+refreshConfig();
+loadKeys();
+restartPolling();
+</script>
+</body>
+</html>

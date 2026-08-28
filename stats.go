@@ -6,18 +6,12 @@ import (
 )
 
 type CacheStats struct {
-	TotalKeys int    `json:"total_keys"`
-	Hits      int    `json:"hits"`
-	Misses    int    `json:"misses"`
-	Uptime    string `json:"uptime"`
-}
-
-func (s *CacheStats) IncrementHits() {
-	s.Hits = s.Hits + 1
-}
-
-func (s *CacheStats) IncrementMisses() {
-	s.Misses = s.Misses + 1
+	TotalKeys   int    `json:"total_keys"`
+	ApproxBytes int64  `json:"approx_bytes"`
+	Hits        int    `json:"hits"`
+	Misses      int    `json:"misses"`
+	Evictions   int    `json:"evictions"`
+	Uptime      string `json:"uptime"`
 }
 
 func getUptimeFormatted() string {

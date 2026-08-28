@@ -1,3 +1,3 @@
-module ihidzhov/cache-db
+module github.com/ihidzhov/cache-db
 
-go 1.21.2
+go 1.27
