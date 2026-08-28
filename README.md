@@ -2,6 +2,8 @@
 
 An HTTP key-value store written in Go — strings, lists, and hashes, each with a TTL. Similar in spirit to Memcached, but with a search endpoint, a built-in web dashboard, and an official Go client.
 
+![cache-db dashboard](dashboard.png)
+
 ---
 
 ### 📦 Already have a Go project and just want to talk to cache-db?
